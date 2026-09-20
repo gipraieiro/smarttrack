@@ -11,6 +11,14 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { alerts } from "../data/mockData";
 
+import EmptyState from "../components/EmptyState";
+import ErrorState from "../components/ErrorState";
+
+import {
+  mockAlertsScenarios,
+  MockScenario,
+} from "../data/mockScenarios";
+
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
@@ -23,6 +31,28 @@ type NavigationProp = NativeStackNavigationProp<
 
 export default function AlertsScreen() {
   const navigation = useNavigation<NavigationProp>();
+
+  /*
+   * =====================================================
+   * CENÁRIO MOCKADO — SPRINT 3
+   * =====================================================
+   *
+   * success -> dados normais
+   * empty   -> nenhum ponto encontrado
+   * error   -> erro simulado
+   *
+   * O cenário inicial permanece "success",
+   * preservando o funcionamento atual da aplicação.
+   */
+
+  const [scenario, setScenario] =
+    React.useState<MockScenario>("success");
+
+  const currentScenario =
+    mockAlertsScenarios[scenario];
+
+  const currentAlerts =
+    currentScenario.data;
 
   /*
    * =====================================================
@@ -96,7 +126,7 @@ export default function AlertsScreen() {
    * Primeiro aparecem as áreas de maior risco.
    */
 
-  const sortedAlerts = [...alerts].sort((a, b) => {
+  const sortedAlerts = [...currentAlerts].sort((a, b) => {
     const priority = {
       Alto: 1,
       Médio: 2,
@@ -389,7 +419,7 @@ export default function AlertsScreen() {
 
             <View style={styles.countBadge}>
               <Text style={styles.countText}>
-                {alerts.length}
+                {currentAlerts.length}
               </Text>
             </View>
           </View>
@@ -401,18 +431,35 @@ export default function AlertsScreen() {
       </View>
 
       {/* =================================================
-          LISTA
+          CONTEÚDO DA LISTA
       ================================================= */}
 
-      <FlatList
-        data={sortedAlerts}
-        keyExtractor={(item) =>
-          item.id.toString()
-        }
-        renderItem={renderItem}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-      />
+      {scenario === "error" ? (
+        <ErrorState
+          message={
+            currentScenario.error?.message
+          }
+          onRetry={() =>
+            setScenario("success")
+          }
+        />
+      ) : scenario === "empty" ? (
+        <EmptyState
+          onRetry={() =>
+            setScenario("success")
+          }
+        />
+      ) : (
+        <FlatList
+          data={sortedAlerts}
+          keyExtractor={(item) =>
+            item.id.toString()
+          }
+          renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
     </View>
   );
 }
