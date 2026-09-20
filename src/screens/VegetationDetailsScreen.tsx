@@ -20,6 +20,7 @@ export default function VegetationDetailsScreen() {
   const navigation = useNavigation<any>();
 
   const [teamRequested, setTeamRequested] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   const { alertId } = route.params;
 
@@ -171,6 +172,15 @@ export default function VegetationDetailsScreen() {
    */
 
   const handleRequestTeam = () => {
+    setShowConfirmation(true);
+  };
+
+  const handleCancelRequest = () => {
+    setShowConfirmation(false);
+  };
+
+  const handleConfirmRequest = () => {
+    setShowConfirmation(false);
     setTeamRequested(true);
   };
 
@@ -542,28 +552,92 @@ export default function VegetationDetailsScreen() {
             AÇÃO
         ============================ */}
 
-        {heightRisk !== "Baixo" && !teamRequested && (
-          <TouchableOpacity
-            style={styles.button}
-            activeOpacity={0.85}
-            onPress={handleRequestTeam}
-          >
-            <Ionicons
-              name="construct-outline"
-              size={20}
-              color="#FFFFFF"
-            />
+        {heightRisk !== "Baixo" &&
+          !teamRequested &&
+          !showConfirmation && (
+            <TouchableOpacity
+              style={styles.button}
+              activeOpacity={0.85}
+              onPress={handleRequestTeam}
+            >
+              <Ionicons
+                name="construct-outline"
+                size={20}
+                color="#FFFFFF"
+              />
 
-            <Text style={styles.buttonText}>
-              Solicitar equipe
-            </Text>
+              <Text style={styles.buttonText}>
+                Solicitar equipe
+              </Text>
 
-            <Ionicons
-              name="arrow-forward"
-              size={20}
-              color="#FFFFFF"
-            />
-          </TouchableOpacity>
+              <Ionicons
+                name="arrow-forward"
+                size={20}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+          )}
+
+        {/* ============================
+            CONFIRMAÇÃO DA SOLICITAÇÃO
+        ============================ */}
+
+        {showConfirmation && !teamRequested && (
+          <View style={styles.confirmationCard}>
+
+            <View style={styles.confirmationHeader}>
+
+              <View style={styles.confirmationIcon}>
+                <Ionicons
+                  name="help-circle-outline"
+                  size={22}
+                  color="#176B43"
+                />
+              </View>
+
+              <View style={styles.confirmationContent}>
+                <Text style={styles.confirmationTitle}>
+                  Solicitar equipe?
+                </Text>
+
+                <Text style={styles.confirmationText}>
+                  Deseja registrar uma solicitação de manutenção para esta área?
+                </Text>
+              </View>
+
+            </View>
+
+            <View style={styles.confirmationButtons}>
+
+              <TouchableOpacity
+                style={styles.cancelButton}
+                activeOpacity={0.85}
+                onPress={handleCancelRequest}
+              >
+                <Text style={styles.cancelButtonText}>
+                  Cancelar
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.confirmButton}
+                activeOpacity={0.85}
+                onPress={handleConfirmRequest}
+              >
+                <Ionicons
+                  name="checkmark"
+                  size={18}
+                  color="#FFFFFF"
+                />
+
+                <Text style={styles.confirmButtonText}>
+                  Confirmar
+                </Text>
+              </TouchableOpacity>
+
+            </View>
+
+          </View>
         )}
 
         {/* ============================
@@ -1025,6 +1099,97 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     marginHorizontal: 10,
+  },
+
+  /* ============================
+     CONFIRMAÇÃO
+  ============================ */
+
+  confirmationCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 2,
+
+    shadowColor: "#193B2A",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+
+    elevation: 2,
+  },
+
+  confirmationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  confirmationIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#EAF6EF",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  confirmationContent: {
+    flex: 1,
+    marginLeft: 10,
+  },
+
+  confirmationTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#26352D",
+  },
+
+  confirmationText: {
+    fontSize: 11,
+    color: "#718078",
+    marginTop: 3,
+    lineHeight: 16,
+  },
+
+  confirmationButtons: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 15,
+  },
+
+  cancelButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 11,
+    backgroundColor: "#F1F4F2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  cancelButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#607069",
+  },
+
+  confirmButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 11,
+    backgroundColor: "#176B43",
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  confirmButtonText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    marginLeft: 6,
   },
 
   /* ============================
