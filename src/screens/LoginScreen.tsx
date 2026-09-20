@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,33 @@ type NavigationProp = NativeStackNavigationProp<
 
 export default function LoginScreen() {
   const navigation = useNavigation<NavigationProp>();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+
+  const handleLogin = () => {
+    const emailTrimmed = email.trim();
+    const passwordTrimmed = password.trim();
+
+    if (!emailTrimmed && !passwordTrimmed) {
+      setErrorMessage("Informe seu e-mail e sua senha.");
+      return;
+    }
+
+    if (!emailTrimmed) {
+      setErrorMessage("Informe seu e-mail.");
+      return;
+    }
+
+    if (!passwordTrimmed) {
+      setErrorMessage("Informe sua senha.");
+      return;
+    }
+
+    setErrorMessage("");
+    navigation.navigate("Dashboard");
+  };
 
   return (
     <KeyboardAvoidingView
@@ -70,7 +97,14 @@ export default function LoginScreen() {
 
             {/* EMAIL */}
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[
+                styles.inputContainer,
+                errorMessage &&
+                !email.trim() &&
+                styles.inputError,
+              ]}
+            >
               <Ionicons
                 name="mail-outline"
                 size={21}
@@ -84,12 +118,26 @@ export default function LoginScreen() {
                 style={styles.input}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                value={email}
+                onChangeText={(text) => {
+                  setEmail(text);
+                  if (errorMessage) {
+                    setErrorMessage("");
+                  }
+                }}
               />
             </View>
 
             {/* SENHA */}
 
-            <View style={styles.inputContainer}>
+            <View
+              style={[
+                styles.inputContainer,
+                errorMessage &&
+                !password.trim() &&
+                styles.inputError,
+              ]}
+            >
               <Ionicons
                 name="lock-closed-outline"
                 size={21}
@@ -102,15 +150,38 @@ export default function LoginScreen() {
                 placeholderTextColor="#9AA5A0"
                 secureTextEntry
                 style={styles.input}
+                value={password}
+                onChangeText={(text) => {
+                  setPassword(text);
+                  if (errorMessage) {
+                    setErrorMessage("");
+                  }
+                }}
               />
             </View>
+
+            {/* MENSAGEM DE ERRO */}
+
+            {errorMessage ? (
+              <View style={styles.errorContainer}>
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={17}
+                  color="#B54747"
+                />
+
+                <Text style={styles.errorText}>
+                  {errorMessage}
+                </Text>
+              </View>
+            ) : null}
 
             {/* BOTÃO */}
 
             <TouchableOpacity
               style={styles.button}
               activeOpacity={0.85}
-              onPress={() => navigation.navigate("Dashboard")}
+              onPress={handleLogin}
             >
               <Text style={styles.buttonText}>
                 Entrar
@@ -166,17 +237,17 @@ const styles = StyleSheet.create({
   /* LOGO */
 
   logoContainer: {
-  width: 280,
-  height: 180,
-  justifyContent: "center",
-  alignItems: "center",
-  marginBottom: 10,
-},
+    width: 280,
+    height: 180,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 10,
+  },
 
-logo: {
-  width: 275,
-  height: 175,
-},
+  logo: {
+    width: 275,
+    height: 175,
+  },
 
   /* CABEÇALHO */
 
@@ -250,6 +321,10 @@ logo: {
     marginBottom: 14,
   },
 
+  inputError: {
+    borderColor: "#D9A3A3",
+  },
+
   inputIcon: {
     marginLeft: 15,
     marginRight: 10,
@@ -263,6 +338,23 @@ logo: {
     fontSize: 15,
 
     paddingRight: 15,
+  },
+
+  /* ERRO */
+
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: -2,
+    marginBottom: 8,
+  },
+
+  errorText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "#B54747",
+    marginLeft: 6,
   },
 
   /* BOTÃO */
