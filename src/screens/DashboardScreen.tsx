@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -9,60 +10,150 @@ import {
   StatusBar,
   Modal,
 } from "react-native";
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 import { alerts } from "../data/mockData";
-
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useNavigation } from "@react-navigation/native";
-
-import { RootStackParamList } from "../navigation/AppNavigator";
+import type {
+  RootStackParamList,
+  NewOccurrence,
+} from "../navigation/AppNavigator";
 
 type NavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   "Dashboard"
 >;
 
+const STORAGE_KEY = "@smarttrack/new-occurrences";
+
+type DashboardArea = {
+  heightInCm: number;
+  risk: NewOccurrence["risk"];
+  growthTrend: string;
+};
+
 export default function DashboardScreen() {
   const navigation = useNavigation<NavigationProp>();
 
   const [mapVisible, setMapVisible] = useState(false);
+  const [newOccurrences, setNewOccurrences] = useState<NewOccurrence[]>([]);
 
-  /*
-   * ============================
-   * DADOS DO MONITORAMENTO
-   * ============================
-   */
+  // Classificação de risco padronizada com as demais telas.
+  const getRiskByHeight = (
+    heightInCm: number
+  ): NewOccurrence["risk"] => {
+    if (heightInCm >= 30) return "Alto";
+    if (heightInCm >= 15) return "Médio";
+    return "Baixo";
+  };
 
-  const criticalAreas = alerts.filter(
+  // Atualiza as ocorrências sempre que o Dashboard recebe foco.
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function loadOccurrences() {
+        try {
+          const stored = await AsyncStorage.getItem(STORAGE_KEY);
+
+          if (!stored) {
+            if (isActive) setNewOccurrences([]);
+            return;
+          }
+
+          const parsed: unknown = JSON.parse(stored);
+
+          if (!Array.isArray(parsed)) {
+            if (isActive) setNewOccurrences([]);
+            return;
+          }
+
+          const validOccurrences = parsed.filter(
+            (item): item is NewOccurrence =>
+              item !== null &&
+              typeof item === "object" &&
+              typeof item.id === "number" &&
+              Number.isFinite(item.id) &&
+              typeof item.height === "number" &&
+              Number.isFinite(item.height) &&
+              item.height > 0 &&
+              typeof item.location === "string" &&
+              typeof item.temperature === "number" &&
+              typeof item.humidity === "number" &&
+              typeof item.description === "string"
+          );
+
+          if (isActive) {
+            setNewOccurrences(validOccurrences);
+          }
+        } catch (error) {
+          console.error(
+            "Erro ao carregar ocorrências no Dashboard:",
+            error
+          );
+
+          if (isActive) setNewOccurrences([]);
+        }
+      }
+
+      loadOccurrences();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
+  // Os pontos fixos usam altura em metros no mockData.
+  const fixedAreas: DashboardArea[] = alerts.map((item) => {
+    const heightInCm = Number(item.height) * 100;
+
+    return {
+      heightInCm,
+      risk: getRiskByHeight(heightInCm),
+      growthTrend: item.growthTrend,
+    };
+  });
+
+  // As ocorrências cadastradas já têm altura em centímetros.
+  const registeredAreas: DashboardArea[] = newOccurrences.map((item) => ({
+    heightInCm: item.height,
+    risk: getRiskByHeight(item.height),
+    growthTrend:
+      item.risk === "Alto"
+        ? "Alta"
+        : item.risk === "Médio"
+        ? "Média"
+        : "Baixa",
+  }));
+
+  // Consolida os pontos fixos e os registros cadastrados.
+  const allAreas = [...fixedAreas, ...registeredAreas];
+
+  const criticalAreas = allAreas.filter(
     (item) => item.risk === "Alto"
   ).length;
 
-  const alertAreas = alerts.filter(
+  const alertAreas = allAreas.filter(
     (item) => item.risk === "Médio"
   ).length;
 
-  const monitoredAreas = alerts.filter(
+  const monitoredAreas = allAreas.filter(
     (item) => item.risk === "Baixo"
   ).length;
 
-  /*
-   * Altura média da vegetação
-   */
-
+  // Média de altura em centímetros, considerando todos os pontos.
   const averageHeight =
-    alerts.reduce(
-      (total, item) => total + item.height,
-      0
-    ) / alerts.length;
+    allAreas.length > 0
+      ? allAreas.reduce(
+          (total, item) => total + item.heightInCm,
+          0
+        ) / allAreas.length
+      : 0;
 
-  /*
-   * Quantidade de pontos com tendência
-   * de crescimento alta.
-   */
-
-  const highGrowthAreas = alerts.filter(
+  const highGrowthAreas = allAreas.filter(
     (item) => item.growthTrend === "Alta"
   ).length;
 
@@ -77,17 +168,10 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-
-        {/* ============================
-            HEADER
-        ============================ */}
-
+        {/* CABEÇALHO */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>
-              Olá, Marcelo
-            </Text>
-
+            <Text style={styles.greeting}>Olá, Marcelo</Text>
             <Text style={styles.headerSubtitle}>
               Supervisor operacional
             </Text>
@@ -102,14 +186,9 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* ============================
-            TÍTULO
-        ============================ */}
-
+        {/* TÍTULO */}
         <View style={styles.titleSection}>
-          <Text style={styles.title}>
-            Monitoramento
-          </Text>
+          <Text style={styles.title}>Monitoramento</Text>
 
           <View style={styles.roadInfo}>
             <Ionicons
@@ -117,32 +196,21 @@ export default function DashboardScreen() {
               size={16}
               color="#176B43"
             />
-
             <Text style={styles.roadText}>
               BR-381 • Fernão Dias
             </Text>
           </View>
         </View>
 
-        {/* ============================
-            RESUMO
-        ============================ */}
-
+        {/* RESUMO DA OPERAÇÃO */}
         <Text style={styles.sectionTitle}>
           Resumo da operação
         </Text>
 
         <View style={styles.cardsContainer}>
-
           {/* ÁREAS CRÍTICAS */}
-
           <View style={styles.card}>
-            <View
-              style={[
-                styles.cardIcon,
-                styles.cardIconRed,
-              ]}
-            >
+            <View style={[styles.cardIcon, styles.cardIconRed]}>
               <Ionicons
                 name="warning-outline"
                 size={20}
@@ -150,28 +218,16 @@ export default function DashboardScreen() {
               />
             </View>
 
-            <Text style={styles.cardValue}>
-              {criticalAreas}
-            </Text>
-
-            <Text style={styles.cardTitle}>
-              Áreas críticas
-            </Text>
-
+            <Text style={styles.cardValue}>{criticalAreas}</Text>
+            <Text style={styles.cardTitle}>Áreas críticas</Text>
             <Text style={styles.cardDescription}>
               Intervenção urgente
             </Text>
           </View>
 
           {/* ÁREAS EM ALERTA */}
-
           <View style={styles.card}>
-            <View
-              style={[
-                styles.cardIcon,
-                styles.cardIconYellow,
-              ]}
-            >
+            <View style={[styles.cardIcon, styles.cardIconYellow]}>
               <Ionicons
                 name="alert-circle-outline"
                 size={20}
@@ -179,28 +235,16 @@ export default function DashboardScreen() {
               />
             </View>
 
-            <Text style={styles.cardValue}>
-              {alertAreas}
-            </Text>
-
-            <Text style={styles.cardTitle}>
-              Em alerta
-            </Text>
-
+            <Text style={styles.cardValue}>{alertAreas}</Text>
+            <Text style={styles.cardTitle}>Em alerta</Text>
             <Text style={styles.cardDescription}>
               Requer acompanhamento
             </Text>
           </View>
 
           {/* ÁREAS MONITORADAS */}
-
           <View style={styles.card}>
-            <View
-              style={[
-                styles.cardIcon,
-                styles.cardIconGreen,
-              ]}
-            >
+            <View style={[styles.cardIcon, styles.cardIconGreen]}>
               <Ionicons
                 name="checkmark-circle-outline"
                 size={20}
@@ -208,31 +252,20 @@ export default function DashboardScreen() {
               />
             </View>
 
-            <Text style={styles.cardValue}>
-              {monitoredAreas}
-            </Text>
-
-            <Text style={styles.cardTitle}>
-              Monitoradas
-            </Text>
-
+            <Text style={styles.cardValue}>{monitoredAreas}</Text>
+            <Text style={styles.cardTitle}>Monitoradas</Text>
             <Text style={styles.cardDescription}>
               Sem intervenção
             </Text>
           </View>
-
         </View>
 
-        {/* ============================
-            MAPA
-        ============================ */}
-
+        {/* MAPA */}
         <View style={styles.sectionHeader}>
           <View>
             <Text style={styles.sectionTitle}>
               Mapa de monitoramento
             </Text>
-
             <Text style={styles.sectionSubtitle}>
               Pontos monitorados ao longo da Fernão Dias
             </Text>
@@ -240,27 +273,23 @@ export default function DashboardScreen() {
 
           <View style={styles.liveIndicator}>
             <View style={styles.liveDot} />
-
-            <Text style={styles.liveText}>
-              AO VIVO
-            </Text>
+            <Text style={styles.liveText}>MONITORAMENTO</Text>
           </View>
         </View>
 
         {/* MAPA CLICÁVEL */}
-
         <TouchableOpacity
           activeOpacity={0.9}
           onPress={() => setMapVisible(true)}
           style={styles.mapCard}
+          accessibilityRole="button"
+          accessibilityLabel="Ampliar mapa de monitoramento"
         >
           <Image
             source={require("../../assets/images/mapa-fernaodias.png")}
             style={styles.map}
             resizeMode="cover"
           />
-
-          {/* ÍCONE DE AMPLIAR */}
 
           <View style={styles.expandIcon}>
             <Ionicons
@@ -271,22 +300,20 @@ export default function DashboardScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* ============================
-            MAPA AMPLIADO
-        ============================ */}
-
+        {/* MAPA AMPLIADO */}
         <Modal
           visible={mapVisible}
           animationType="fade"
-          transparent={true}
+          transparent
           onRequestClose={() => setMapVisible(false)}
         >
           <View style={styles.modalContainer}>
-
             <TouchableOpacity
               style={styles.closeButton}
               activeOpacity={0.8}
               onPress={() => setMapVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Fechar mapa ampliado"
             >
               <Ionicons
                 name="close"
@@ -300,53 +327,46 @@ export default function DashboardScreen() {
               style={styles.fullMap}
               resizeMode="contain"
             />
-
           </View>
         </Modal>
 
-        {/* ============================
-    INDICADORES OPERACIONAIS
-============================ */}
+        {/* INDICADORES OPERACIONAIS */}
+        <Text style={styles.sectionTitle}>
+          Indicadores operacionais
+        </Text>
 
-<Text style={styles.sectionTitle}>
-  Indicadores operacionais
-</Text>
+        <View style={styles.indicatorsContainer}>
+          {/* ALTURA MÉDIA */}
+          <View style={styles.indicatorCard}>
+            <View
+              style={[
+                styles.indicatorIcon,
+                styles.indicatorGreen,
+              ]}
+            >
+              <Ionicons
+                name="resize-outline"
+                size={21}
+                color="#176B43"
+              />
+            </View>
 
-<View style={styles.indicatorsContainer}>
+            <View style={styles.indicatorContent}>
+              <Text style={styles.indicatorLabel}>
+                Altura média
+              </Text>
 
-  {/* ALTURA DA VEGETAÇÃO */}
+              <Text style={styles.indicatorValue}>
+                {Math.round(averageHeight)} cm
+              </Text>
 
-  <View style={styles.indicatorCard}>
-    <View
-      style={[
-        styles.indicatorIcon,
-        styles.indicatorGreen,
-      ]}
-    >
-      <Ionicons
-        name="resize-outline"
-        size={21}
-        color="#176B43"
-      />
-    </View>
-
-    <View style={styles.indicatorContent}>
-      <Text style={styles.indicatorLabel}>
-        Altura média
-      </Text>
-
-      <Text style={styles.indicatorValue}>
-        {Math.round(averageHeight * 100)} cm
-      </Text>
-
-      <Text style={styles.indicatorSubtext}>
-        Vegetação monitorada
-      </Text>
-    </View>
-  </View>
+              <Text style={styles.indicatorSubtext}>
+                Vegetação monitorada
+              </Text>
+            </View>
+          </View>
 
           {/* TENDÊNCIA DE CRESCIMENTO */}
-
           <View style={styles.indicatorCard}>
             <View
               style={[
@@ -375,17 +395,14 @@ export default function DashboardScreen() {
               </Text>
             </View>
           </View>
-
         </View>
 
-        {/* ============================
-            BOTÃO
-        ============================ */}
-
+        {/* BOTÃO DE MONITORAMENTO */}
         <TouchableOpacity
           style={styles.button}
           activeOpacity={0.85}
           onPress={() => navigation.navigate("Alerts")}
+          accessibilityRole="button"
         >
           <View style={styles.buttonIcon}>
             <Ionicons
@@ -406,33 +423,23 @@ export default function DashboardScreen() {
           />
         </TouchableOpacity>
 
-        {/* ============================
-            ÚLTIMA ATUALIZAÇÃO
-        ============================ */}
-
+        {/* ÚLTIMA ATUALIZAÇÃO */}
         <View style={styles.updateInfo}>
           <Ionicons
             name="time-outline"
             size={14}
             color="#8A958F"
           />
-
           <Text style={styles.updateText}>
-            Última atualização
+            Indicadores atualizados ao abrir esta tela
           </Text>
         </View>
-
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-
-  /* ============================
-     CONTAINER
-  ============================ */
-
   container: {
     flex: 1,
     backgroundColor: "#F4F7F5",
@@ -443,10 +450,6 @@ const styles = StyleSheet.create({
     paddingTop: 55,
     paddingBottom: 35,
   },
-
-  /* ============================
-     HEADER
-  ============================ */
 
   header: {
     flexDirection: "row",
@@ -476,10 +479,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 
-  /* ============================
-     TÍTULO
-  ============================ */
-
   titleSection: {
     marginBottom: 18,
   },
@@ -503,10 +502,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 
-  /* ============================
-     SEÇÕES
-  ============================ */
-
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -529,10 +524,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  /* ============================
-     CARDS DE RESUMO
-  ============================ */
-
   cardsContainer: {
     flexDirection: "row",
     gap: 10,
@@ -545,15 +536,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 15,
     padding: 13,
-
     shadowColor: "#193B2A",
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.05,
     shadowRadius: 9,
-
     elevation: 2,
   },
 
@@ -598,10 +584,6 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
 
-  /* ============================
-     MAPA
-  ============================ */
-
   liveIndicator: {
     flexDirection: "row",
     alignItems: "center",
@@ -633,15 +615,10 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     marginBottom: 27,
-
     shadowColor: "#193B2A",
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.07,
     shadowRadius: 10,
-
     elevation: 3,
   },
 
@@ -661,19 +638,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     elevation: 3,
-
     shadowColor: "#193B2A",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 5,
   },
-
-  /* ============================
-     MAPA AMPLIADO
-  ============================ */
 
   modalContainer: {
     flex: 1,
@@ -700,10 +669,6 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
 
-  /* ============================
-     INDICADORES OPERACIONAIS
-  ============================ */
-
   indicatorsContainer: {
     gap: 11,
     marginBottom: 27,
@@ -715,15 +680,10 @@ const styles = StyleSheet.create({
     padding: 15,
     flexDirection: "row",
     alignItems: "center",
-
     shadowColor: "#193B2A",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
-
     elevation: 2,
   },
 
@@ -767,28 +727,18 @@ const styles = StyleSheet.create({
     marginTop: 3,
   },
 
-  /* ============================
-     BOTÃO
-  ============================ */
-
   button: {
     width: "100%",
     height: 57,
     backgroundColor: "#176B43",
     borderRadius: 13,
-
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-
     shadowColor: "#176B43",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.16,
     shadowRadius: 8,
-
     elevation: 3,
   },
 
@@ -802,10 +752,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginRight: 10,
   },
-
-  /* ============================
-     ÚLTIMA ATUALIZAÇÃO
-  ============================ */
 
   updateInfo: {
     flexDirection: "row",
