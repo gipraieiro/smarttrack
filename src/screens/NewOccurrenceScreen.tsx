@@ -159,7 +159,7 @@ export default function NewOccurrenceScreen() {
         [
           {
             text: "Ver alertas",
-            onPress: () => navigation.navigate("Alerts"),
+            onPress: () => navigation.popTo("Alerts"),
           },
         ]
       );
